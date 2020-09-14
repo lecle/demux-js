@@ -42,7 +42,7 @@ export class BaseActionWatcher {
    * Starts a polling loop running in replay mode.
    */
   public async replay() {
-    await this.watch(true)
+    return await this.watch(true)
   }
 
   /**
@@ -55,14 +55,16 @@ export class BaseActionWatcher {
       this.running = false
       this.shouldPause = false
       this.log.info('Indexing paused.')
-      return
+      return false
     }
+
     this.clean = false
     this.running = true
     this.error = null
     const startTime = Date.now()
 
     this.log.debug('Checking for blocks...')
+
     try {
       await this.checkForBlocks(isReplay)
     } catch (err) {
@@ -72,32 +74,37 @@ export class BaseActionWatcher {
       this.log.error(err)
       this.error = err
       this.log.info('Indexing unexpectedly stopped due to an error.')
-      return
+
+      throw err
     }
 
     const endTime = Date.now()
     const duration = endTime - startTime
     let waitTime = this.pollInterval - duration
+
     if (waitTime < 0) {
       waitTime = 0
     }
+
     this.log.debug(`Block check took ${duration}ms; waiting ${waitTime}ms before next check`)
     setTimeout(async () => await this.watch(false), waitTime)
+
+    return true
   }
 
   /**
    * Start or resume indexing.
    */
-  public start(): boolean {
+  public async start() {
     if (this.running) {
       this.log.info('Cannot start; already indexing.')
       return false
     }
+
     this.log.info('Starting indexing.')
 
     // tslint:disable-next-line:no-floating-promises
-    this.watch()
-    return true
+    return await this.watch()
   }
 
   /**
