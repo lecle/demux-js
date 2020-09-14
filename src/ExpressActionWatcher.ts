@@ -29,8 +29,8 @@ export class ExpressActionWatcher extends BaseActionWatcher {
       res.json(this.info)
     })
 
-    this.express.post('/start', (_, res: express.Response) => {
-      res.json({ success: this.start() })
+    this.express.post('/start', async (_, res: express.Response) => {
+      res.json({ success: await this.start() })
     })
 
     this.express.post('/pause', (_, res: express.Response) => {
