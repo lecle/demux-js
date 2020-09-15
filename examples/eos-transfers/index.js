@@ -3,7 +3,7 @@
  * Watcher with both of those.
  */
 
-const { BaseActionWatcher } = require("demux")
+const { BaseActionWatcher } = require("../../dist/BaseActionWatcher")
 const { NodeosActionReader } = require("demux-eos") // eslint-disable-line
 const ObjectActionHandler = require("./ObjectActionHandler")
 const handlerVersion = require("./handlerVersions/v1")
@@ -25,9 +25,9 @@ const actionHandler = new ObjectActionHandler([handlerVersion])
  * https://github.com/EOSIO/demux-js-eos
  */
 const actionReader = new NodeosActionReader({
-  startAtBlock: 50000000,
+  startAtBlock: 14504805,
   onlyIrreversible: false,
-  nodeosEndpoint: "https://api.eosnewyork.io"
+  nodeosEndpoint: "https://testnet.canfoundation.io"
 })
 
 /* BaseActionWatcher
@@ -41,6 +41,19 @@ const actionWatcher = new BaseActionWatcher(
   actionReader,
   actionHandler,
   250,
-)
+);
 
-actionWatcher.watch()
+async function start() {
+  try {
+    await actionWatcher.start();
+  } catch (error) {
+    console.log(error);
+
+    // Handle error and retry again...
+
+    console.log("Retrying in 60 seconds...");
+    setTimeout(async () => await actionWatcher.start(), 60 * 1000);
+  }
+}
+
+start();
