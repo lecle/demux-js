@@ -25,7 +25,7 @@
  *   In this example, we keep a history of the entire state at every block, and load it when called.
  */
 
-const { AbstractActionHandler } = require("demux")
+const { AbstractActionHandler } = require("../../dist/AbstractActionHandler")
 
 // Initial state
 let state = {
@@ -56,11 +56,13 @@ class ObjectActionHandler extends AbstractActionHandler {
     return state.indexState
   }
 
-  async updateIndexState(stateObj, block, isReplay, handlerVersionName) {
-    stateObj.indexState.blockNumber = block.blockInfo.blockNumber
-    stateObj.indexState.blockHash = block.blockInfo.blockHash
+  async updateIndexState(stateObj, nextBlock, isReplay, handlerVersionName) {
+    stateObj.indexState.blockNumber = nextBlock.block.blockInfo.blockNumber
+    stateObj.indexState.blockHash = nextBlock.block.blockInfo.blockHash
     stateObj.indexState.isReplay = isReplay
     stateObj.indexState.handlerVersionName = handlerVersionName
+
+    this.log.info(nextBlock.block)
   }
 
   async rollbackTo(blockNumber) {
