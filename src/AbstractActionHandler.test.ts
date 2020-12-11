@@ -1,4 +1,4 @@
-import { MismatchedBlockHashError, NotInitializedError } from './errors'
+import { NotInitializedError } from './errors'
 import { ActionCallback, EffectRunMode, StatelessActionCallback } from './interfaces'
 import blockchains from './testHelpers/blockchains'
 import { TestActionHandler } from './testHelpers/TestActionHandler'
@@ -41,7 +41,7 @@ describe('Action Handler', () => {
 
     startSlowEffect = jest.fn().mockResolvedValue(undefined)
     finishSlowEffect = jest.fn()
-    startThrownEffect = jest.fn().mockResolvedValue(undefined)
+    startThrownEffect = jest.fn()
 
     runUpgradeUpdater = jest.fn().mockReturnValue('v2')
 
@@ -94,8 +94,8 @@ describe('Action Handler', () => {
           },
           {
             actionType: 'eosio.system::regproducer',
-            run: async () => {
-              await startThrownEffect()
+            run: () => {
+              startThrownEffect()
               throw Error('Thrown effect')
             }
           }
@@ -230,23 +230,29 @@ describe('Action Handler', () => {
     expect(seekBlockNum).toBe(3)
   })
 
-  it('throws error if previous block hash and last processed don\'t match up', async () => {
+  it('roll back to last irreversible block if previous block hash and last processed don\'t match up', async () => {
+    const lastIrreversibleBlockNumber = 9;
     await actionHandler.initialize()
-    actionHandler.setLastProcessedBlockNumber(3)
+    actionHandler.setLastProcessedBlockNumber(15)
     actionHandler.setLastProcessedBlockHash('asdfasdfasdf')
+    actionHandler.state.indexState.lastIrreversibleBlockNumber = lastIrreversibleBlockNumber;
     const blockMeta = {
       isRollback: false,
       isEarliestBlock: false,
       isNewBlock: true,
     }
     const nextBlock = {
-      block: blockchain[3],
+      block: { ...blockchain[3], blockInfo: { ...blockchain[3].blockInfo, blockNumber: 16 } },
       blockMeta,
-      lastIrreversibleBlockNumber: 1,
+      lastIrreversibleBlockNumber: 9,
     }
 
-    const result = actionHandler.handleBlock(nextBlock, false)
-    await expect(result).rejects.toThrow(MismatchedBlockHashError)
+    const result = await actionHandler.handleBlock(nextBlock, false)
+    // roll back to last irreversible block number is 0
+    // @ts-ignore
+    expect(actionHandler.lastProcessedBlockNumber).toBe(lastIrreversibleBlockNumber)
+    // return next block needed is one block ahead last irreversible block
+    expect(result).toBe(lastIrreversibleBlockNumber + 1)
   })
 
   it(`doesn't throw error if validateBlocks is false`, async () => {
@@ -562,9 +568,11 @@ describe('Action Handler', () => {
     }
     const versionedActions = await actionHandler._applyUpdaters({}, nextBlock, {},  false)
     await actionHandler._runEffects(versionedActions, {}, nextBlock)
-    expect(startThrownEffect).toHaveBeenCalled()
-    expect(actionHandler.info.numberOfRunningEffects).toEqual(0)
+    expect(startThrownEffect).toBeCalledTimes(1)
+    expect(actionHandler.info.numberOfRunningEffects).toEqual(1)
+    expect(runEffect).toBeCalledTimes(2)
     expect(actionHandler.info.effectErrors).toHaveLength(1)
-    expect(actionHandler.info.effectErrors![0].startsWith('Error: Thrown effect')).toBeTruthy()
+    // @ts-ignore
+    expect(actionHandler.info.effectErrors[0].startsWith('Error: Thrown effect')).toBeTruthy()
   })
 })

@@ -1,14 +1,5 @@
 // tslint:disable:max-classes-per-file
 // Disabling tslint's max classes rule here because it would add a lot of unnecessary separation for simple classes.
-
-export class MismatchedBlockHashError extends Error {
-  constructor(currentBlock: number, expectedHash: string, actualHash: string) {
-    super(`Block hashes do not match; block not part of current chain.`
-          + ` Current block: ${currentBlock} Expected: ${expectedHash} Found: ${actualHash}`)
-    Object.setPrototypeOf(this, MismatchedBlockHashError.prototype)
-  }
-}
-
 export class MissingHandlerVersionError extends Error {
   constructor() {
     super('Must have at least one handler version.')
