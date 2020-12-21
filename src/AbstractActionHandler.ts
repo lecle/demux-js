@@ -1,7 +1,6 @@
 import { BunyanProvider, Logger, LogLevel } from './BunyanProvider'
 import {
   DuplicateHandlerVersionError,
-  MismatchedBlockHashError,
   MissingHandlerVersionError,
 } from './errors'
 import {
@@ -89,7 +88,7 @@ export abstract class AbstractActionHandler implements ActionHandler {
     await this.handleRollback(isRollback, blockInfo.blockNumber, isReplay, isEarliestBlock)
 
     await this.refreshIndexState()
-    const nextBlockNeeded = this.lastProcessedBlockNumber + 1
+    let nextBlockNeeded = this.lastProcessedBlockNumber + 1
 
     // Just processed this block; skip
     if (blockInfo.blockNumber === this.lastProcessedBlockNumber
@@ -112,12 +111,10 @@ export abstract class AbstractActionHandler implements ActionHandler {
         return nextBlockNeeded
       }
       // Block sequence consistency should be handled by the ActionReader instance
-      if (blockInfo.previousBlockHash !== this.lastProcessedBlockHash) {
-        throw new MismatchedBlockHashError(
-          blockInfo.blockNumber,
-          this.lastProcessedBlockHash,
-          blockInfo.previousBlockHash
-        )
+      if (this.lastProcessedBlockHash && blockInfo.previousBlockHash !== this.lastProcessedBlockHash) {
+        nextBlockNeeded = this.lastIrreversibleBlockNumber + 1
+        await this.handleRollbackToLastIrreversibleBlock()
+        return nextBlockNeeded
       }
     }
 
@@ -313,6 +310,16 @@ export abstract class AbstractActionHandler implements ActionHandler {
       const rollbackTime = Date.now() - rollbackStart
       this.log.info(`Rolled back ${rollbackCount} blocks to block ${rollbackBlockNumber} (${rollbackTime}ms)`)
     }
+  }
+
+  private async handleRollbackToLastIrreversibleBlock() {
+    const rollbackCount = this.lastProcessedBlockNumber - this.lastIrreversibleBlockNumber
+    this.log.debug(`Rolling back ${rollbackCount} blocks to last irreversible block ${this.lastIrreversibleBlockNumber}...`)
+    const rollbackStart = Date.now()
+    await this.rollbackTo(this.lastIrreversibleBlockNumber)
+    this.rollbackDeferredEffects(this.lastIrreversibleBlockNumber)
+    const rollbackTime = Date.now() - rollbackStart
+    this.log.info(`Rolled back ${rollbackCount} blocks to block ${this.lastIrreversibleBlockNumber} (${rollbackTime}ms)`)
   }
 
   private range(start: number, end: number) {
